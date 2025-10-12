@@ -17,6 +17,7 @@ A ComfyUI custom node for Google's **Gemini 2.5 Flash Image** (aka "Nano Banana"
 - ComfyUI
 - **Paid Google Gemini API Key** (Free tier does not support image generation)
 - Python packages (installed automatically):
+  - `google-genai`
   - `google-generativeai`
   - `torch`
   - `pillow`
