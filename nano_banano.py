@@ -48,7 +48,7 @@ class ComfyUI_NanoBanana:
                     "multiline": True,
                     "tooltip": "Describe what you want to generate or edit"
                 }),
-                "operation": (["generate", "edit", "style_transfer", "object_insertion"], {
+                "operation": (["generate", "edit", "style_transfer", "object_insertion","compose"], {
                     "default": "generate",
                     "tooltip": "Choose the type of image operation"
                 }),
@@ -74,6 +74,10 @@ class ComfyUI_NanoBanana:
                     "forceInput": False,
                     "tooltip": "Fifth reference image (optional)"
                 }),
+
+                "external_prompt": ("STRING", {
+                    "tooltip": "Prompt input from another node (will override main prompt)"
+                }),
                 "api_key": ("STRING", {
                     "default": "",
                     "tooltip": "Your Gemini API key (paid tier required)"
@@ -96,7 +100,7 @@ class ComfyUI_NanoBanana:
                     "default": "high",
                     "tooltip": "Image generation quality"
                 }),
-                "aspect_ratio": (["1:1", "16:9", "9:16", "4:3", "3:4","5:4","4:5","3:2","2:3"], {
+                "aspect_ratio": (["1:1", "16:9", "9:16", "4:3", "3:4","5:4","4:5","3:2","2:3","5:4","4:5","21:9"], {
                     "default": "1:1",
                     "tooltip": "Output image aspect ratio"
                 }),
@@ -188,7 +192,7 @@ class ComfyUI_NanoBanana:
             }
         }
 
-    def build_prompt_for_operation(self, prompt, operation, has_references=False, character_consistency=True):
+    def build_prompt_for_operation(self, prompt, operation, has_references=False, has_two_more_references=False,character_consistency=True):
         """Build optimized prompt based on operation type"""
         
         # aspect_instructions = {
@@ -244,6 +248,22 @@ class ComfyUI_NanoBanana:
                     "Maintain **character consistency and visual identity** for existing elements, "
                     "while making the new elements look realistic and coherent within the scene. "
                     "Use the highest quality settings available."
+                )
+        
+        elif operation == "compose":
+            if not has_two_more_references:
+                return "Error: Compose requires two images"
+            final_prompt = (
+                    f"""You are tasked with generating a photorealistic image by combining two source images: an 'influencer photo' and a 'product photo'.
+                        {prompt}
+                        Instructions for Image Generation:
+                        Combination Goal: Create a single, cohesive, ultra-realistic 4K resolution image suitable for a livestream or commercial context.
+                        Influencer Integration: Position the influencer from the 'influencer photo' naturally within the new scene. Maintain the influencer's original appearance, proportions, and identity.
+                        Product Integration: Incorporate the product from the 'product photo' into the scene. The product's appearance (colors, shapes, textures, details) must remain absolutely unchanged. Its size and position can be adjusted as necessary to achieve realistic composition and interaction.
+                        Interaction: The influencer must be shown interacting with the product in a natural and contextually appropriate manner. Examples of interaction include: wearing, holding, using, sitting on, standing beside, or demonstrating the product. If the product is sport-related, consider interactions like riding, playing with, or actively using it.
+                        Background & Environment: The background and surrounding environment can be modified, simplified, or completely changed to create an optimal setting for the product and influencer interaction. The goal is a clean, professional, livestream-style composition with realistic, natural lighting and a studio-quality feel.
+                        Realism & Quality: The final image must exhibit high detail, professional product photography aesthetics, and ensure all elements, especially the person, appear naturally proportioned. Include any necessary safety equipment or protective devices if contextually appropriate for the product and interaction.
+                        Constraint: Do not invent brand names or alter the influencer's identity."""
                 )
 
         
@@ -362,10 +382,11 @@ class ComfyUI_NanoBanana:
             return [], operation_log
 
     def nano_banana_generate(self, prompt, operation, reference_image_1=None, reference_image_2=None, 
-                           reference_image_3=None, reference_image_4=None, reference_image_5=None, api_key="", 
+                           reference_image_3=None, reference_image_4=None, reference_image_5=None, external_prompt=None,api_key="", 
                            batch_count=1, temperature=0.7, quality="high", aspect_ratio="1:1",
                            character_consistency=True, enable_safety=True):
         
+        prompt= external_prompt if external_prompt is not None else prompt
         # Validate and set API key
         if api_key.strip():
             self.api_key = api_key
@@ -384,10 +405,10 @@ class ComfyUI_NanoBanana:
                 reference_image_1, reference_image_2, reference_image_3, reference_image_4, reference_image_5
             )
             has_references = len(encoded_images) > 0
-            
+            has_two_more_references = len(encoded_images) > 1
             # Build optimized prompt
             final_prompt = self.build_prompt_for_operation(
-                prompt, operation, has_references, character_consistency
+                prompt, operation, has_references,has_two_more_references, character_consistency
             )
             
             if "Error:" in final_prompt:
